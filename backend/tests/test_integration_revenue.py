@@ -25,13 +25,34 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _clean_cache():
-    """Each test starts with an empty cache so ordering can't hide a leak."""
+async def _isolated_backends():
+    """
+    Give each test its own connections and an empty cache.
+
+    The database pool and the Redis client are module-level singletons, which is
+    what you want in the app -- one long-lived event loop -- but each test here
+    runs on a fresh loop, so connections made on a previous one are already dead.
+    Rebuilding them per test keeps that an artefact of the harness rather than
+    something the application code has to know about. The empty cache also means
+    test ordering can't mask a leak.
+    """
+    import os
+
+    import redis.asyncio as redis
+
+    from app.core.database_pool import db_pool
     from app.services import cache as cache_module
 
+    cache_module.redis_client = redis.Redis.from_url(
+        os.getenv("REDIS_URL", "redis://localhost:6380/0")
+    )
     await cache_module.redis_client.flushdb()
+
     yield
+
     await cache_module.redis_client.flushdb()
+    await cache_module.redis_client.aclose()
+    await db_pool.close()
 
 
 # ---------------------------------------------------------------------------

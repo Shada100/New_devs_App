@@ -48,7 +48,7 @@ async def get_revenue_summary(property_id: str, tenant_id: str) -> Dict[str, Any
     result = await calculate_total_revenue(property_id, tenant_id)
 
     # Cache the result for 5 minutes
-    await redis_client.setex(cache_key, CACHE_TTL_SECONDS, json.dumps(result))
+    await redis_client.set(cache_key, json.dumps(result), ex=CACHE_TTL_SECONDS)
 
     return result
 

@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 import logging
 from ..config import settings
 
@@ -40,7 +40,9 @@ class DatabasePool:
 
             self.engine = create_async_engine(
                 database_url,
-                poolclass=QueuePool,
+                # The async engine needs the async-aware pool; plain QueuePool
+                # is rejected outright at engine creation.
+                poolclass=AsyncAdaptedQueuePool,
                 pool_size=settings.database_pool_size,
                 max_overflow=30,  # Additional connections when needed
                 pool_pre_ping=True,  # Validate connections
